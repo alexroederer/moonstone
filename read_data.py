@@ -15,6 +15,7 @@ Currently only supports acquisition of name and ingredients;
 '''
 import json
 #from recipe_scrapers import scrap_me
+import re
 
 class DatasetManager:
     #Constructor requires pass-in reference for file containing database;
@@ -44,15 +45,38 @@ class DatasetManager:
     def getURL(self, recipe):
         return recipe['url']
 
+    def getNumRecipesSeen(self):
+        return self.currentRecipe
+
+    #Cleaning function for ingredients; 
+    #    mostly manages punctuations, removes 
+    #    parantheticals, removes header lines 
+    #    will be unnecessary when parser is upgraded
+    def cleanIngredient(self, ingr):
+        ingr = ingr.replace(',','')
+        ingr = ingr.replace('-',' ')
+        ingr = ingr.replace('_','')
+        ingr = re.sub(r'\([^)]*\)', '', ingr)
+        #Remove verbs
+        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium) *',' ',ingr)
+        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium) *',' ',ingr)
+        ingr = re.sub(r'^ *','',ingr)
+        ingr = re.sub(r' for .+','',ingr)
+        ingr = re.sub(r' \+ .+','',ingr)
+        ingr = re.sub(r' \/ .+','',ingr)
+        ingr = re.sub(r'^\*.*','',ingr)
+        return ingr
+
 #Test main method; prints first 100 recipe names
 if __name__ == '__main__':
     with open('./data/openrecipes.txt', 'r') as f:
         dataset = DatasetManager(f)
         r = dataset.getNextRecipeJSON()
-        count = 1
-        while r is not None and count < 100:
+        while r is not None and dataset.getNumRecipesSeen() < 100:
             print(dataset.getName(r))
-            print(dataset.getIngr(r))
+            ings = dataset.getIngr(r).split('\n')
+            for ing in ings:
+                ing = ing.lower()
+                print(dataset.cleanIngredient(ing))
             r = dataset.getNextRecipeJSON()
-            count += 1
 

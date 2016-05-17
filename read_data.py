@@ -58,13 +58,15 @@ class DatasetManager:
         ingr = ingr.replace('_','')
         ingr = re.sub(r'\([^)]*\)', '', ingr)
         #Remove verbs
-        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium) *',' ',ingr)
-        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium) *',' ',ingr)
+        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium|ground|roughly|thinly|thin) *',' ',ingr)
+        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium|ground|roughly|thinly|thin) *',' ',ingr)
         ingr = re.sub(r'^ *','',ingr)
         ingr = re.sub(r' for .+','',ingr)
         ingr = re.sub(r' \+ .+','',ingr)
         ingr = re.sub(r' \/ .+','',ingr)
         ingr = re.sub(r'^\*.*','',ingr)
+        ingr = re.sub(r'  ',' ',ingr)
+        ingr = ingr.strip()
         return ingr
 
 #Test main method; prints first 100 recipe names

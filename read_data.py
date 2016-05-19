@@ -25,22 +25,17 @@ class DatasetManager:
         self.currentRecipe = 0          #Recipe counter
 
         #Compile regex objects
-        self.ingredientDelRegex = [re.compile(r',.*'), 
-            #Additional clauses
-            re.compile(r' \+ .+'), 
-            re.compile(r'\([^)]*\)'), 
-            re.compile(r' \/ .+'), 
-            re.compile(r'\*'),
+        self.ingredientDelRegex = [
+            #Leading spaces and non-alphabetic characters
+            re.compile(r',.*|\+ .*|\([^)]*\)|\/ .*|\*|^ +'),
             #Extra metric units
-            re.compile(r'[0-9]+ *g *\/ *'), 
-            re.compile(r'[0-9]+ *ml *\/ *'), 
-            #Leading spaces
-            re.compile(r'^ +')]
+            re.compile(r'[0-9]+ *[gml]+ *\/ *')]
 
         self.ingredientSpaceRegex = [re.compile('-'), 
             re.compile(r'  ')]
 
-        self.ingredientFracRegex = [re.compile(r'½'), 
+        self.ingredientFracRegex = re.compile(r'½|¼|¾|⅓')
+        self.ingredientFracRegexSet = [re.compile(r'½'), 
             re.compile(r'¼'),
             re.compile(r'¾'),
             re.compile(r'⅓')]
@@ -52,7 +47,7 @@ class DatasetManager:
         ' 1/3'] 
 
         #Remove verbs
-        self.ingredientVerbsRegex = re.compile(r' *(heaped|cold|sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|diced|dice|more|cut|small|fine|medium|ground|roughly|thinly|thin|big) *')
+        self.ingredientVerbsRegex = re.compile(r' *(heaped ?|cold ?|sliced ?|slices ?|chopped ?|melted ?|grated ?|minced ?|ground ?|splash of ?|to taste ?|lots of ?|finely ?|whole ?|large ?|scant ?|fine ?|assorted ?|weight ?|storebought ?|store bought ?|containers ?|diced ?|dice ?|more ?|cut ?|small ?|fine ?|medium ?|ground ?|roughly ?|thinly ?|thin ?|big ?|crushed ?|natural ?|medium ?|fresh ?|plus more ?)+ *')
 
     #Returns next recipe in file as JSON object
     def getNextRecipeJSON(self):
@@ -89,8 +84,9 @@ class DatasetManager:
         for pattern in self.ingredientDelRegex:
             ingr = pattern.sub('',ingr)
 
-        for pattern, repl in zip(self.ingredientFracRegex, self.ingredientFracReplace):
-            ingr = pattern.sub(repl,ingr)
+        if self.ingredientFracRegex.search(ingr) is not None:
+            for pattern, repl in zip(self.ingredientFracRegexSet, self.ingredientFracReplace):
+                ingr = pattern.sub(repl,ingr)
 
         ingr = self.ingredientVerbsRegex.sub(' ', ingr)
 

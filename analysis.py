@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     print("Create data")
     fileLoc = './data/openrecipes.txt'
-    fileLoc = './data/recipeitems-latest.json'
+    #fileLoc = './data/recipeitems-latest.json'
     dlog = DataLog(fileLoc)
     
     print("Run Analysis")

@@ -38,13 +38,27 @@ class DataLog():
         with open(dataFileLoc, 'r') as f:
             self.countIngredients(f)
         #Remove rare items from ingredients list
-        self.removeRareItems()
+        self.removeRareItemsToReachSize(100)
 
     #Runs the initial cooccurance matrix creation
     def initCooccurance(self, dataFileLoc):
         #Create cooccurance matrix 
         with open(dataFileLoc, 'r') as f:
-            self.createCoOccurance(f)
+            #Create matrix structure
+            self.cooccuranceMatrix = np.zeros((self.totalItems, self.totalItems))
+            #Create index for each food
+            self.createIndex()
+            #Iterate through recipes counting food pairs
+            dataset = DatasetManager(f)
+            recipe = dataset.getNextRecipeJSON()
+            while recipe is not None:
+                ingredients = self.getCleanIngredients(dataset, self.getIngredientsFromRecipe(dataset, recipe))
+                usedIngredients = [f for f in ingredients if f in self.itemIndex]
+                for food1 in usedIngredients:
+                    for food2 in usedIngredients:
+                        self.cooccuranceMatrix[self.itemIndex[food1], 
+                            self.itemIndex[food2]] += 1
+                recipe = dataset.getNextRecipeJSON()
 
     #Adds a food item to the item counts dictionary
     def addItem(self, ingredient):
@@ -58,19 +72,19 @@ class DataLog():
     def countIngredients(self, f):
         dataset = DatasetManager(f)
         recipe = dataset.getNextRecipeJSON()
+        recipeCount = 0
         while recipe is not None:
             #Collect list of all ingredients
-            ingredients = self.getIngredientsFromRecipe(dataset, recipe)
+            ingredients = self.getCleanIngredients(dataset, self.getIngredientsFromRecipe(dataset, recipe))
             for food in ingredients:
                 self.addItem(food)
             recipe = dataset.getNextRecipeJSON()
-            print(self.totalItems)
+            recipeCount += 1
+            print(recipeCount, self.totalItems)
 
     #Gets clean list of ingredients in a recipe
-    def getIngredientsFromRecipe(self, dataset, recipe):
+    def getCleanIngredients(self, dataset, ings):
         ingredientsList = []
-        ings = dataset.getIngr(recipe)
-        ings = ings.split('\n')
         for ing in ings:
             ing = dataset.cleanIngredient(ing.lower())
             try:
@@ -83,15 +97,47 @@ class DataLog():
                 pass
         return ingredientsList
 
+    def getIngredientsFromRecipe(self, dataset, recipe):
+        ings = dataset.getIngr(recipe)
+        ings = ings.split('\n')
+        return ings
+
     #Removes items which occur cutoff times or less from itemCounts
-    def removeRareItems(self, cutoff=1):
+    def removeRareItems(self, cutoffCount):
         rareItems = []
         for food in self.itemCounts:
-            if self.itemCounts[food] <= cutoff:
+            if self.itemCounts[food] <= cutoffCount:
                 rareItems.append(food)
         for food in rareItems:
             del self.itemCounts[food]
         self.totalItems -= len(rareItems)
+        return self.totalItems
+
+    def removeRareItemsToReachSize(self, numItemsDesired):
+        itemsByCount = {}
+        for food in self.itemCounts:
+            count = self.itemCounts[food]
+            if count not in itemsByCount:
+                itemsByCount[count] = [food]
+            else:
+                itemsByCount[count].append(food)
+        numItemsWithEachCount = []
+        for count in itemsByCount:
+            numItemsWithEachCount.append((count, len(itemsByCount[count])))
+        numItemsWithEachCount.sort(key=lambda item: item[0])
+
+        itemsToRemove = []
+        totalRemoved = 0
+
+        for (count, number) in numItemsWithEachCount:
+            itemsToRemove.extend(itemsByCount[count])
+            totalRemoved += number
+            if ((self.totalItems - totalRemoved) <= numItemsDesired):
+                break
+        for food in itemsToRemove:
+            del self.itemCounts[food]
+        self.totalItems -= totalRemoved
+        return self.totalItems
 
     #Creates indexes into cooccurance matrix
     def createIndex(self):
@@ -99,30 +145,10 @@ class DataLog():
             self.itemIndex[food] = index
             self.foods.append(food)
 
-    #Creates cooccurance matrix
-    def createCoOccurance(self, f):
-        #Create matrix structure
-        self.cooccuranceMatrix = np.zeros((self.totalItems, self.totalItems))
-
-        #Create index for each food
-        self.createIndex()
-
-        #Iterate through recipes counting food pairs
-        dataset = DatasetManager(f)
-        recipe = dataset.getNextRecipeJSON()
-        while recipe is not None:
-            ingredients = self.getIngredientsFromRecipe(dataset, recipe)
-            usedIngredients = [f for f in ingredients if f in self.itemIndex]
-            for food1 in usedIngredients:
-                for food2 in usedIngredients:
-                    self.cooccuranceMatrix[self.itemIndex[food1], 
-                        self.itemIndex[food2]] += 1
-            recipe = dataset.getNextRecipeJSON()
-    
 if __name__ == '__main__':
     print("Data Log Test") 
     fileLoc = './data/openrecipes.txt'
-    fileLoc = './data/recipeitems-latest.json'
+#    fileLoc = './data/recipeitems-latest.json'
     dlog = DataLog(fileLoc)
     #dlog.initCooccurance(fileLoc)
     #print(dlog.cooccuranceMatrix)

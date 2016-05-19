@@ -24,6 +24,36 @@ class DatasetManager:
         self.dataHandle = dataHandle    #Data handle
         self.currentRecipe = 0          #Recipe counter
 
+        #Compile regex objects
+        self.ingredientDelRegex = [re.compile(r',.*'), 
+            #Additional clauses
+            re.compile(r' \+ .+'), 
+            re.compile(r'\([^)]*\)'), 
+            re.compile(r' \/ .+'), 
+            re.compile(r'\*'),
+            #Extra metric units
+            re.compile(r'[0-9]+ *g *\/ *'), 
+            re.compile(r'[0-9]+ *ml *\/ *'), 
+            #Leading spaces
+            re.compile(r'^ +')]
+
+        self.ingredientSpaceRegex = [re.compile('-'), 
+            re.compile(r'  ')]
+
+        self.ingredientFracRegex = [re.compile(r'½'), 
+            re.compile(r'¼'),
+            re.compile(r'¾'),
+            re.compile(r'⅓')]
+
+        #Remove special fraction symbols
+        self.ingredientFracReplace = [' 1/2', 
+        ' 1/4', 
+        ' 3/4', 
+        ' 1/3'] 
+
+        #Remove verbs
+        self.ingredientVerbsRegex = re.compile(r' *(heaped|cold|sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|diced|dice|more|cut|small|fine|medium|ground|roughly|thinly|thin|big) *')
+
     #Returns next recipe in file as JSON object
     def getNextRecipeJSON(self):
         recipeString = self.dataHandle.readline()
@@ -31,7 +61,7 @@ class DatasetManager:
             #End of file reached
             return None
         else:
-            x = json.loads(self.dataHandle.readline())
+            x = json.loads(recipeString)
             self.currentRecipe += 1
             return x
 
@@ -45,6 +75,9 @@ class DatasetManager:
     def getURL(self, recipe):
         return recipe['url']
 
+    def getSource(self, recipe):
+        return recipe['source']
+
     def getNumRecipesSeen(self):
         return self.currentRecipe
 
@@ -53,25 +86,25 @@ class DatasetManager:
     #    parantheticals, removes header lines 
     #    will be unnecessary when parser is upgraded
     def cleanIngredient(self, ingr):
-        ingr = ingr.replace(',','')
-        ingr = ingr.replace('-',' ')
-        ingr = ingr.replace('_','')
-        ingr = re.sub(r'\([^)]*\)', '', ingr)
-        #Remove verbs
-        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium|ground|roughly|thinly|thin) *',' ',ingr)
-        ingr = re.sub(r' *(sliced|slices|chopped|melted|grated|minced|ground|splash of|to taste|lots|finely|whole|large|scant|fine|assorted|weight|storebought|containers|dice|diced|more|cut|small|fine|medium|ground|roughly|thinly|thin) *',' ',ingr)
-        ingr = re.sub(r'^ *','',ingr)
-        ingr = re.sub(r' for .+','',ingr)
-        ingr = re.sub(r' \+ .+','',ingr)
-        ingr = re.sub(r' \/ .+','',ingr)
-        ingr = re.sub(r'^\*.*','',ingr)
-        ingr = re.sub(r'  ',' ',ingr)
+        for pattern in self.ingredientDelRegex:
+            ingr = pattern.sub('',ingr)
+
+        for pattern, repl in zip(self.ingredientFracRegex, self.ingredientFracReplace):
+            ingr = pattern.sub(repl,ingr)
+
+        ingr = self.ingredientVerbsRegex.sub(' ', ingr)
+
+        #Extra spaces
+        for pattern in self.ingredientSpaceRegex:
+            ingr = pattern.sub(' ',ingr)
         ingr = ingr.strip()
         return ingr
 
 #Test main method; prints first 100 recipe names
 if __name__ == '__main__':
-    with open('./data/openrecipes.txt', 'r') as f:
+    filename = './data/openrecipes.txt'
+    filename = './data/recipeitems-latest.json'
+    with open(filename, 'r') as f:
         dataset = DatasetManager(f)
         r = dataset.getNextRecipeJSON()
         while r is not None and dataset.getNumRecipesSeen() < 100:

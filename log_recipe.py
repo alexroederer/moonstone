@@ -23,17 +23,25 @@ from read_data import DatasetManager
 
 class DataLog():
     def __init__(self, dataFileLoc):
-        self.itemCounts = {}            #Num times food appears in a recipe
+        self.itemCounts = {}            #Num times food appears in recipes
         self.totalItems = 0             #Total num foods
-        self.cooccuranceMatrix = None   #Cooccurance matrix
         self.foods = []                 #List of foods considered in cooccurance
         self.itemIndex = {}             #Indexes for foods into cooccurance 
 
+        self.cooccuranceMatrix = None   #Cooccurance matrix
+
+        self.initCountIngredients(dataFileLoc)
+
+    #Runs the initial ingredient count
+    def initCountIngredients(self, dataFileLoc):
         #Get ingredient counts
         with open(dataFileLoc, 'r') as f:
             self.countIngredients(f)
         #Remove rare items from ingredients list
         self.removeRareItems()
+
+    #Runs the initial cooccurance matrix creation
+    def initCooccurance(self, dataFileLoc):
         #Create cooccurance matrix 
         with open(dataFileLoc, 'r') as f:
             self.createCoOccurance(f)
@@ -56,6 +64,7 @@ class DataLog():
             for food in ingredients:
                 self.addItem(food)
             recipe = dataset.getNextRecipeJSON()
+            print(self.totalItems)
 
     #Gets clean list of ingredients in a recipe
     def getIngredientsFromRecipe(self, dataset, recipe):
@@ -113,6 +122,8 @@ class DataLog():
 if __name__ == '__main__':
     print("Data Log Test") 
     fileLoc = './data/openrecipes.txt'
+    fileLoc = './data/recipeitems-latest.json'
     dlog = DataLog(fileLoc)
-    print(dlog.cooccuranceMatrix)
+    #dlog.initCooccurance(fileLoc)
+    #print(dlog.cooccuranceMatrix)
 

@@ -20,45 +20,80 @@ more prone to error in unique cases.
 import numpy as np
 from ingreedypy import Ingreedy
 from read_data import DatasetManager
+import pickle
 
 class DataLog():
-    def __init__(self, dataFileLoc):
+    def __init__(self, dataFileLoc, pickleLoc=None):
+        #Counts of ingredients (used to construct cooccurance matrix)
         self.itemCounts = {}            #Num times food appears in recipes
         self.totalItems = 0             #Total num foods
+
+        #Saved recipes (for speedup)
+        self.recipeIngredients = None
+
+        self.cooccuranceMatrix = None   #Cooccurance matrix
         self.foods = []                 #List of foods considered in cooccurance
         self.itemIndex = {}             #Indexes for foods into cooccurance 
 
-        self.cooccuranceMatrix = None   #Cooccurance matrix
+        if pickleLoc is None:
+            self.initCountIngredients(dataFileLoc)
+            self.initCooccurance()
+        else:
+            self.loadSetupFromPickle(pickleLoc)
 
-        self.initCountIngredients(dataFileLoc)
+    def loadSetupFromPickle(self, pickleLoc):
+        setupDict = None
+        with open(pickleLoc, 'rb') as pickleFile:
+            setupDict = pickle.load(pickleFile)
+        if setupDict is not None:
+            self.itemCounts = setupDict['itemCounts']
+            self.totalItems = setupDict['totalItems']
+            self.recipeIngredients = setupDict['recipeIngredients']
+            self.cooccuranceMatrix = setupDict['cooccuranceMatrix']
+            self.foods = setupDict['foods']
+            self.itemIndex = setupDict['itemIndex']
+        else:
+            print("Warning: Pickle Load unsuccessful.")
+
+    def saveSetupToPickle(self, fileLoc):
+        setup = {'itemCounts': self.itemCounts, 
+                'totalItems': self.totalItems, 
+                'recipeIngredients': self.recipeIngredients, 
+                'cooccuranceMatrix': self.cooccuranceMatrix, 
+                'foods': self.foods, 
+                'itemIndex': self.itemIndex}
+
+        with open(fileLoc, 'wb') as output:
+            pickle.dump(setup, output)
 
     #Runs the initial ingredient count
     def initCountIngredients(self, dataFileLoc):
+        self.recipeIngredients = []
+        self.itemCounts = {}
+        self.totalItems = 0
+
         #Get ingredient counts
         with open(dataFileLoc, 'r') as f:
             self.countIngredients(f)
         #Remove rare items from ingredients list
-        self.removeRareItemsToReachSize(100)
+        self.removeRareItemsToReachSize(1000)
 
     #Runs the initial cooccurance matrix creation
-    def initCooccurance(self, dataFileLoc):
-        #Create cooccurance matrix 
-        with open(dataFileLoc, 'r') as f:
-            #Create matrix structure
-            self.cooccuranceMatrix = np.zeros((self.totalItems, self.totalItems))
-            #Create index for each food
-            self.createIndex()
-            #Iterate through recipes counting food pairs
-            dataset = DatasetManager(f)
-            recipe = dataset.getNextRecipeJSON()
-            while recipe is not None:
-                ingredients = self.getCleanIngredients(dataset, self.getIngredientsFromRecipe(dataset, recipe))
-                usedIngredients = [f for f in ingredients if f in self.itemIndex]
-                for food1 in usedIngredients:
-                    for food2 in usedIngredients:
-                        self.cooccuranceMatrix[self.itemIndex[food1], 
-                            self.itemIndex[food2]] += 1
-                recipe = dataset.getNextRecipeJSON()
+    def initCooccurance(self):
+        #TODO: print warning if ingredient count has not been performed
+
+        #Create matrix structure
+        self.cooccuranceMatrix = np.zeros((self.totalItems, self.totalItems))
+        #Create index for each food
+        self.createIndex()
+        #Iterate through recipes counting food pairs
+        #Recipes should have already been collected by item counter
+        for ingredients in self.recipeIngredients:
+            usedIngredients = [f for f in ingredients if f in self.itemIndex]
+            for food1 in usedIngredients:
+                for food2 in usedIngredients:
+                    self.cooccuranceMatrix[self.itemIndex[food1], 
+                        self.itemIndex[food2]] += 1
 
     #Adds a food item to the item counts dictionary
     def addItem(self, ingredient):
@@ -72,15 +107,16 @@ class DataLog():
     def countIngredients(self, f):
         dataset = DatasetManager(f)
         recipe = dataset.getNextRecipeJSON()
-        recipeCount = 0
+        recipeCount = 0 #DEBUG
         while recipe is not None:
             #Collect list of all ingredients
             ingredients = self.getCleanIngredients(dataset, self.getIngredientsFromRecipe(dataset, recipe))
+            self.recipeIngredients.append(ingredients)
             for food in ingredients:
                 self.addItem(food)
             recipe = dataset.getNextRecipeJSON()
             recipeCount += 1
-            print(recipeCount, self.totalItems)
+            print(recipeCount, self.totalItems) #DEBUG
 
     #Gets clean list of ingredients in a recipe
     def getCleanIngredients(self, dataset, ings):
@@ -113,6 +149,7 @@ class DataLog():
         self.totalItems -= len(rareItems)
         return self.totalItems
 
+    #Removes rarer items until only the specified number of items or fewer are left in itemCounts
     def removeRareItemsToReachSize(self, numItemsDesired):
         itemsByCount = {}
         for food in self.itemCounts:
@@ -147,8 +184,8 @@ class DataLog():
 
 if __name__ == '__main__':
     print("Data Log Test") 
-    fileLoc = './data/openrecipes.txt'
-#    fileLoc = './data/recipeitems-latest.json'
+#    fileLoc = './data/openrecipes.txt'
+    fileLoc = './data/recipeitems-latest.json'
     dlog = DataLog(fileLoc)
     #dlog.initCooccurance(fileLoc)
     #print(dlog.cooccuranceMatrix)

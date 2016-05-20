@@ -8,6 +8,7 @@ Creates visualizations from recipe data
 """
 
 from matplotlib import pyplot as plt
+import numpy as np
 
 def labelBars(bars, ax):
     for bar in bars:
@@ -42,3 +43,19 @@ def frequencyHistogram(itemCounts):
 
     labelBars(bars, ax)
 
+def cooccuranceHeatmap(coocMat, labels):
+    fig, ax = plt.subplots()
+    heatmap = ax.pcolor(coocMat, cmap=plt.cm.Blues)
+
+    #Put major ticks at middle of each cell
+    ax.set_xticks(np.arange(coocMat.shape[0])+0.5, minor=False)
+    ax.set_yticks(np.arange(coocMat.shape[1])+0.5, minor=False)
+
+    #Use a table-like display
+    ax.invert_yaxis()
+    ax.xaxis.tick_top()
+
+    ax.set_yticklabels(labels, minor=False, size=8)
+    ax.set_xticklabels(labels, minor=False, rotation='vertical', size=8)
+
+    

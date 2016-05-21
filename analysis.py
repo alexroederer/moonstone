@@ -1,12 +1,16 @@
 '''
 analysis.py runs analysis on a cooccurance matrix to find clusters 
 Current implementation uses Shi-Malik algorithm (normalized cuts): 
-use symmetric normalized Laplacian, find second-smallest eigenvalue, use eigenvector. 
+use symmetric normalized Laplacian, find second-smallest eigenvalue, use 
+its eigenvector, and you get a minimized normalized graph cut. 
+
+Use this repeatedly for hierarchical clustering. 
 
 @author: Alexander Roederer
 @date: May 16, 2016
 
-Note: figure out where lonely 'mayonnaise' item in dataset (no other ingredients in recipe) is coming from
+Note: figure out where lonely 'mayonnaise' item in dataset 
+(no other ingredients in recipe) is coming from
 
 '''
 
@@ -19,7 +23,18 @@ from scipy.linalg import eigh
 from matplotlib import pyplot as plt
 
 class ClusterCooccurance:
-    def __init__(self, weightedAdjacency):
+    def __init__(self):
+        pass
+
+    #Given an adjacency matrix and a set of rows/cols to consider, 
+    #and returns the indexes split into two sets based on max cut clustering
+    def splitIndexes(self, adj, indexes):
+        subAdjMat = adj[indexes,:]
+        subAdjMat = subAdjMat[:,indexes]
+        split = self.findCluster(subAdjMat)
+        return indexes[split], indexes[~split]
+
+    def findCluster(self, weightedAdjacency):
         self.wadjM = weightedAdjacency
         self.fadjM = (self.wadjM != 0).astype(int)
         #Remove self-loops
@@ -32,8 +47,8 @@ class ClusterCooccurance:
         empty = np.where(np.sum(self.fadjM,0) == 0)
         self.wadjM = np.delete(self.wadjM, empty, axis=0)
         self.wadjM = np.delete(self.wadjM, empty, axis=1)
-        self.fadjM = np.delete(self.fadjM, empty, axis=0)
-        self.fadjM = np.delete(self.fadjM, empty, axis=1)
+        #self.fadjM = np.delete(self.fadjM, empty, axis=0)
+        #self.fadjM = np.delete(self.fadjM, empty, axis=1)
 
         #Create degree matrix
         self.degreeM = np.diag(np.sum(self.wadjM,0))
@@ -45,20 +60,18 @@ class ClusterCooccurance:
         #self.laplacian = self.degreeM - self.wadjM
 
         #Normalized laplacian
-        #Laplacian ends up being identity matrix??? TODO
-        self.laplacian = self.degreeMSplit * ( self.degreeM -  self.wadjM )* self.degreeMSplit
+        #Note that repeated multiplication doesn't seem to work properly? 
+        #Small values get truncated which ruins the laplacian
+        self.laplacian = np.dot(np.dot(self.degreeMSplit,
+            (self.degreeM - self.wadjM )),self.degreeMSplit)
 
         #Decompose laplacian to find eigenvalues
         self.eigenvalues, self.eigenvectors = eigh(self.laplacian)
-        self.k = 20  #num clusters
 
-        #Select largest eigenvalues to form clusters
-        self.largeEigVal = self.evals[0:self.k]
-        self.largeEigVec = self.evecs[0:self.k]
-
-        self.newFeatures = np.transpose(self.largeEigVec)
-        #K-means over them to find clusters
-        centers, self.clusters = kmeans2(self.newFeatures, self.k)
+        #Use second smallest eigenvalue's eigenvector 
+        goodEigenvector = self.eigenvectors[:, 1]
+        #Threshold based on mean (median is noisy)
+        return goodEigenvector < np.mean(goodEigenvector)
 
     def printClusterContents(self, labels, cluster):
         a, = np.where(cc.clusters==cluster)
@@ -70,15 +83,36 @@ if __name__ == '__main__':
     print("Create data")
     #fileLoc = './data/openrecipes.txt'
     #fileLoc = './data/recipeitems-latest.json'
+    #dlog = DataLog(fileLoc)
 
     pickleFile = './data.pkl'
     dlog = DataLog(None, pickleLoc=pickleFile)
     
     print("Run Analysis")
-    cc = ClusterCooccurance(dlog.cooccuranceMatrix)
+    #Create clusterer object
+    cc = ClusterCooccurance()
+    maxClusterSize = 10
 
-    print(cc.clusters)
-    f = np.array(dlog.foods)
-    for i in range(0, cc.k):
-        cc.printClusterContents(f, i)
+    allIndexes = np.arange(np.shape(dlog.cooccuranceMatrix)[0])
+    clusterQueue = [allIndexes]
+    finishedClusters = []
+
+    while len(clusterQueue) > 0:
+        index = clusterQueue.pop(0)
+        split1, split2 = cc.splitIndexes(dlog.cooccuranceMatrix, index)
+    
+        if len(split1) < 1 or len(split2) < 1: 
+            print("Cannot split group further")
+            finishedClusters.append(split1)
+            finishedClusters.append(split2)
+        else:
+            for split in [split1, split2]:
+                if len(split) > maxClusterSize:
+                    clusterQueue.append(split)
+                else:
+                    finishedClusters.append(split)
+
+    for cluster in finishedClusters:
+        f = np.array(dlog.foods)
+        print(f[cluster])
     
